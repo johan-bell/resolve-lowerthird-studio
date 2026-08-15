@@ -1,0 +1,19 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Native/postinstall builds we explicitly trust.
+# allowBuilds is read by pnpm >= 11, onlyBuiltDependencies by pnpm 10.
+allowBuilds:
+  better-sqlite3: true
+  ffmpeg-static: true
+  esbuild: true
+  "@swc/core": true
+  unrs-resolver: true
+
+onlyBuiltDependencies:
+  - better-sqlite3
+  - ffmpeg-static
+  - esbuild
+  - "@swc/core"
+  - unrs-resolver

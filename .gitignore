@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.local
+.env
+apps/backend/data/
+python/.venv/
+__pycache__/
+.DS_Store
+setup.log
+renders/

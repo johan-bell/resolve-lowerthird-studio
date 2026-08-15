@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-stage: #0f1115;
+  --color-panel: #16181d;
+  --color-raised: #1e2128;
+  --color-stroke: #2a2e37;
+  --color-accent: #e8483f;
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-stage);
+  color: #d4d4d8;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

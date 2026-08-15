@@ -1,0 +1,3 @@
+# The Resolve bridge is stdlib-only: DaVinciResolveScript ships with DaVinci
+# Resolve itself and is located at runtime via RESOLVE_SCRIPT_API/LIB.
+# Pin any future third-party dependencies here.
