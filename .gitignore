@@ -9,3 +9,6 @@ python/.venv/
 __pycache__/
 .DS_Store
 setup.log
+
+# Scratch folder used when a file has to be set aside rather than deleted.
+_to_delete/

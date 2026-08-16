@@ -232,6 +232,7 @@ dist/
 .env
 apps/backend/data/
 renders/
+_to_delete/
 .pnpm-install.log
 python/.venv/
 __pycache__/
