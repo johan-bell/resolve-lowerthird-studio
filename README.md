@@ -211,3 +211,22 @@ An earlier run didn't shut down. `pkill -f "vite|nest start"`, then start again.
 
 [MIT](LICENSE) — free to use, modify and distribute, provided the copyright
 notice is kept.
+
+### Third-party licences
+
+The code in this repository is MIT. Its runtime dependencies — Vue, NestJS,
+TypeORM, better-sqlite3, `@napi-rs/canvas`, socket.io and class-validator — are
+MIT as well.
+
+One exception is worth naming: **`ffmpeg-static` is GPL-3.0-or-later**. No
+ffmpeg binary is redistributed here — it is downloaded into `node_modules`
+during `./scripts/setup.sh`, which is git-ignored — and the app runs it as a
+separate process rather than linking against it.
+
+If you package this into a distributable application that ships the binary (a
+`.dmg`, an Electron build, an installer), the GPL terms travel with it and apply
+to what you distribute. The usual way around that is to bundle an LGPL build of
+ffmpeg instead, or to require ffmpeg to be installed separately on the machine.
+
+I'm not a lawyer and this isn't legal advice — if you plan to distribute a
+packaged build commercially, it's worth a proper look.
