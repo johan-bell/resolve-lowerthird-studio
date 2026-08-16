@@ -10,6 +10,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import type { Anchor, LayoutVariant } from '@lower-thirds/shared';
 import { PaddingDto } from '../../presets/dto/preset.dto';
 
 export class TimingDto {
@@ -35,8 +36,16 @@ export class TimingDto {
 }
 
 export class StyleDto {
+  @IsIn(['solid-bar', 'accent-stripe', 'two-tone', 'minimal', 'underline', 'offset-block'])
+  layout!: LayoutVariant;
+
   @IsString()
   fontFamily!: string;
+
+  @IsInt()
+  @Min(100)
+  @Max(900)
+  fontWeight!: number;
 
   @IsInt()
   @Min(8)
@@ -53,6 +62,27 @@ export class StyleDto {
 
   @IsString()
   backgroundHex!: string;
+
+  @IsString()
+  accentHex!: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  cornerRadius!: number;
+
+  @IsIn(['top-left','top-center','top-right','middle-left','center','middle-right','bottom-left','bottom-center','bottom-right'])
+  anchor!: Anchor;
+
+  @IsNumber()
+  @Min(-1)
+  @Max(1)
+  offsetX!: number;
+
+  @IsNumber()
+  @Min(-1)
+  @Max(1)
+  offsetY!: number;
 
   @ValidateNested()
   @Type(() => PaddingDto)

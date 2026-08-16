@@ -17,3 +17,7 @@ onlyBuiltDependencies:
   - esbuild
   - "@swc/core"
   - unrs-resolver
+
+minimumReleaseAgeExclude:
+  - '@vue/language-core@3.3.10'
+  - 'vue-tsc@3.3.10'

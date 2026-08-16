@@ -28,6 +28,10 @@ export const useRenderStore = defineStore('render', () => {
     timing.value = { ...timing.value, ...patch };
   };
 
+  const resetTiming = (): void => {
+    timing.value = { ...DEFAULT_TIMING };
+  };
+
   async function loadCapability(): Promise<void> {
     const result = await api.renderCapability();
     if (!result.ok) {
@@ -95,6 +99,7 @@ export const useRenderStore = defineStore('render', () => {
     error,
     canRender,
     patchTiming,
+    resetTiming,
     loadCapability,
     applyProgress,
     render,

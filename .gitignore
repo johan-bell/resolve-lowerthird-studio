@@ -3,8 +3,9 @@ dist/
 *.local
 .env
 apps/backend/data/
+renders/
+.pnpm-install.log
 python/.venv/
 __pycache__/
 .DS_Store
 setup.log
-renders/

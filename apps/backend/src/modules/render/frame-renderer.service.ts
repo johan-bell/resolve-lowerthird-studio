@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { createCanvas, type SKRSContext2D } from '@napi-rs/canvas';
+import { createCanvas } from '@napi-rs/canvas';
 import {
+  buildPlan,
+  drawPlan,
   frameStateAt,
-  layoutLowerThird,
-  LINE_HEIGHT_RATIO,
-  STACK_GAP,
+  placeBlock,
   type AnimationTiming,
-  type LowerThirdLayout,
+  type Ctx2D,
+  type LowerThirdPlan,
   type LowerThirdStyle,
   type MeasureFn,
 } from '@lower-thirds/shared';
@@ -20,101 +21,49 @@ export interface FrameSpec {
   height: number;
 }
 
-/** Left inset and height above frame bottom, as fractions of frame size. */
-const SAFE_LEFT = 0.1;
-const BOTTOM_INSET = 0.18;
-
-const fontString = (style: LowerThirdStyle, size: number, weight: number): string =>
-  `${String(weight)} ${String(size)}px "${style.fontFamily}", sans-serif`;
-
 @Injectable()
 export class FrameRendererService {
   /**
-   * Lay out once per clip rather than per frame — the geometry is identical
-   * across frames, only the animation state changes.
+   * Build the drawing plan once per clip.
+   *
+   * Measurement goes through Skia here and through the browser's text engine in
+   * the preview; both feed the same shared plan builder, so the geometry agrees.
    */
-  layoutFor(spec: FrameSpec): LowerThirdLayout {
+  planFor(spec: FrameSpec): LowerThirdPlan {
     const canvas = createCanvas(8, 8);
     const ctx = canvas.getContext('2d');
     const measure: MeasureFn = (text, size, weight) => {
-      ctx.font = fontString(spec.style, size, weight);
-      return ctx.measureText(text).width;
+      ctx.font = `${String(weight)} ${String(size)}px "${spec.style.fontFamily}", sans-serif`;
+      const m = ctx.measureText(text);
+      const ink =
+        m.actualBoundingBoxRight === undefined
+          ? m.width
+          : (m.actualBoundingBoxLeft ?? 0) + m.actualBoundingBoxRight;
+      return Math.max(m.width, ink);
     };
-    return layoutLowerThird(spec.name, spec.subtitle, spec.style, measure);
+    return buildPlan(spec.name, spec.subtitle, spec.style, measure);
   }
 
-  /**
-   * Draw one frame as a transparent PNG.
-   *
-   * Motion comes from the shared frameStateAt and geometry from the shared
-   * layoutLowerThird, so a rendered file and the browser preview agree by
-   * construction rather than by parallel maintenance.
-   */
-  renderFrame(spec: FrameSpec, frameIndex: number, layout?: LowerThirdLayout): Buffer {
-    const { width, height, style, timing } = spec;
-    const box = layout ?? this.layoutFor(spec);
+  /** Draw one frame as a transparent PNG. */
+  renderFrame(spec: FrameSpec, frameIndex: number, plan?: LowerThirdPlan): Buffer {
+    const { width, height, timing, style } = spec;
+    const drawing = plan ?? this.planFor(spec);
 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     const state = frameStateAt(frameIndex / timing.fps, timing);
 
-    const boxLeft = Math.round(width * SAFE_LEFT);
-    const boxTop = Math.round(height - height * BOTTOM_INSET - box.height);
-
-    // Nothing drawn yet: an untouched canvas is fully transparent.
+    // An untouched canvas is fully transparent — that is the alpha channel.
     if (state.barProgress <= 0) return canvas.toBuffer('image/png');
 
-    const revealed = Math.round(box.width * state.barProgress);
+    const { originX, originY } = placeBlock(drawing, width, height, style);
+    drawPlan(ctx as unknown as Ctx2D, drawing, state, {
+      originX,
+      originY,
+      scale: 1,
+      fontFamily: style.fontFamily,
+    });
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(boxLeft, boxTop, revealed, box.height);
-    ctx.clip();
-
-    ctx.fillStyle = style.backgroundHex;
-    ctx.fillRect(boxLeft, boxTop, box.width, box.height);
-
-    if (state.textOpacity > 0) {
-      // Text shares the bar's clip so no glyph ever precedes the wipe edge.
-      this.drawText(ctx, spec, box, boxLeft, boxTop, state.textOffsetY, state.textOpacity);
-    }
-
-    ctx.restore();
     return canvas.toBuffer('image/png');
-  }
-
-  private drawText(
-    ctx: SKRSContext2D,
-    spec: FrameSpec,
-    box: LowerThirdLayout,
-    boxLeft: number,
-    boxTop: number,
-    offsetY: number,
-    opacity: number,
-  ): void {
-    const { style } = spec;
-    const textLeft = boxLeft + style.padding.x;
-
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = style.foregroundHex;
-
-    let cursorY = boxTop + style.padding.y + offsetY;
-
-    ctx.globalAlpha = opacity;
-    ctx.font = fontString(style, style.fontSize, 600);
-    for (const line of box.nameLines) {
-      ctx.fillText(line, textLeft, cursorY);
-      cursorY += style.fontSize * LINE_HEIGHT_RATIO;
-    }
-
-    if (box.subtitleLines.length === 0) return;
-
-    cursorY += STACK_GAP;
-    ctx.globalAlpha = opacity * 0.72;
-    ctx.font = fontString(style, style.subtitleFontSize, 400);
-    for (const line of box.subtitleLines) {
-      ctx.fillText(line, textLeft, cursorY);
-      cursorY += style.subtitleFontSize * LINE_HEIGHT_RATIO;
-    }
   }
 }

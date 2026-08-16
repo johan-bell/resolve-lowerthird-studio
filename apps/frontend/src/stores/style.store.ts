@@ -6,7 +6,14 @@ import type { StylePreset } from '@/api/presets.api';
 
 /** Compare only the styling fields — id/name/createdAt are metadata. */
 const sameStyle = (a: LowerThirdStyle, b: LowerThirdStyle): boolean =>
+  a.layout === b.layout &&
+  a.accentHex === b.accentHex &&
   a.fontFamily === b.fontFamily &&
+  a.fontWeight === b.fontWeight &&
+  a.cornerRadius === b.cornerRadius &&
+  a.anchor === b.anchor &&
+  a.offsetX === b.offsetX &&
+  a.offsetY === b.offsetY &&
   a.fontSize === b.fontSize &&
   a.subtitleFontSize === b.subtitleFontSize &&
   a.foregroundHex === b.foregroundHex &&
@@ -41,6 +48,39 @@ export const useStyleStore = defineStore('style', () => {
     style.value = { ...style.value, padding: { ...style.value.padding, ...next } };
   };
 
+  /**
+   * Per-section reverts. Scoped rather than all-or-nothing so undoing a colour
+   * experiment doesn't also throw away carefully tuned padding.
+   */
+  const resetTypography = (): void => {
+    patch({
+      fontFamily: DEFAULT_STYLE.fontFamily,
+      fontWeight: DEFAULT_STYLE.fontWeight,
+      fontSize: DEFAULT_STYLE.fontSize,
+      subtitleFontSize: DEFAULT_STYLE.subtitleFontSize,
+    });
+  };
+
+  const resetColour = (): void => {
+    patch({
+      foregroundHex: DEFAULT_STYLE.foregroundHex,
+      backgroundHex: DEFAULT_STYLE.backgroundHex,
+      accentHex: DEFAULT_STYLE.accentHex,
+    });
+  };
+
+  const resetPosition = (): void => {
+    patch({
+      anchor: DEFAULT_STYLE.anchor,
+      offsetX: DEFAULT_STYLE.offsetX,
+      offsetY: DEFAULT_STYLE.offsetY,
+    });
+  };
+
+  const resetBox = (): void => {
+    patch({ cornerRadius: DEFAULT_STYLE.cornerRadius, padding: { ...DEFAULT_STYLE.padding } });
+  };
+
   async function load(): Promise<void> {
     const result = await api.listPresets();
     if (!result.ok) {
@@ -52,18 +92,42 @@ export const useStyleStore = defineStore('style', () => {
     if (activePresetId.value === null && first) applyPreset(first.id);
   }
 
+  /**
+   * Load a preset into the working style.
+   *
+   * Merged over the defaults rather than copied field by field: a preset saved
+   * before a style option existed comes back with that field null, and copying
+   * it verbatim would put `undefined` into the style and break rendering. Every
+   * field is guaranteed present after this.
+   */
   function applyPreset(id: string): void {
     const preset = presets.value.find((p) => p.id === id);
     if (!preset) return;
     activePresetId.value = id;
-    style.value = {
-      fontFamily: preset.fontFamily,
-      fontSize: preset.fontSize,
-      subtitleFontSize: preset.subtitleFontSize,
-      foregroundHex: preset.foregroundHex,
-      backgroundHex: preset.backgroundHex,
-      padding: { ...preset.padding },
+
+    const merged: LowerThirdStyle = structuredClone(DEFAULT_STYLE);
+    const assign = <K extends keyof LowerThirdStyle>(
+      key: K,
+      value: LowerThirdStyle[K] | null | undefined,
+    ): void => {
+      if (value !== null && value !== undefined) merged[key] = value;
     };
+
+    assign('layout', preset.layout);
+    assign('accentHex', preset.accentHex);
+    assign('cornerRadius', preset.cornerRadius);
+    assign('anchor', preset.anchor);
+    assign('offsetX', preset.offsetX);
+    assign('offsetY', preset.offsetY);
+    assign('fontFamily', preset.fontFamily);
+    assign('fontWeight', preset.fontWeight);
+    assign('fontSize', preset.fontSize);
+    assign('subtitleFontSize', preset.subtitleFontSize);
+    assign('foregroundHex', preset.foregroundHex);
+    assign('backgroundHex', preset.backgroundHex);
+    if (preset.padding) merged.padding = { ...DEFAULT_STYLE.padding, ...preset.padding };
+
+    style.value = merged;
   }
 
   async function saveAs(name: string): Promise<boolean> {
@@ -114,6 +178,10 @@ export const useStyleStore = defineStore('style', () => {
     error,
     patch,
     patchPadding,
+    resetTypography,
+    resetColour,
+    resetPosition,
+    resetBox,
     load,
     applyPreset,
     saveAs,

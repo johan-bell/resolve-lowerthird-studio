@@ -10,11 +10,27 @@ export interface PaddingConstraints {
   maxWidth: number;
 }
 
+import type { Anchor, LayoutVariant } from '../layout/plan';
+
 export interface LowerThirdStyle {
+  /** Which of the named looks to draw. */
+  layout: LayoutVariant;
   fontFamily: string;
+  /** Weight of the name; the subtitle sits a step lighter. */
+  fontWeight: number;
   fontSize: number;
   subtitleFontSize: number;
   foregroundHex: string;
   backgroundHex: string;
+  /** Used by the layouts that carry a colour accent. */
+  accentHex: string;
+  /** Corner radius of the panels, in project pixels. 0 is square. */
+  cornerRadius: number;
+  /** Which part of the block is pinned, and to which frame edge. */
+  anchor: Anchor;
+  /** Distance from the anchored edge, as a fraction of frame width. */
+  offsetX: number;
+  /** Distance from the anchored edge, as a fraction of frame height. */
+  offsetY: number;
   padding: PaddingConstraints;
 }

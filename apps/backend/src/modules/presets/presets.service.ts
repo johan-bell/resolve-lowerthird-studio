@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DEFAULT_STYLE, type LowerThirdStyle } from '@lower-thirds/shared';
@@ -14,33 +20,97 @@ export interface StylePreset extends LowerThirdStyle {
 const toDto = (entity: StylePresetEntity): StylePreset => ({
   id: entity.id,
   name: entity.name,
+  layout: entity.layout,
   fontFamily: entity.fontFamily,
+  fontWeight: entity.fontWeight,
   fontSize: entity.fontSize,
   subtitleFontSize: entity.subtitleFontSize,
   foregroundHex: entity.foregroundHex,
   backgroundHex: entity.backgroundHex,
+  accentHex: entity.accentHex,
+  cornerRadius: entity.cornerRadius,
+  anchor: entity.anchor,
+  offsetX: entity.offsetX,
+  offsetY: entity.offsetY,
   padding: entity.padding,
   createdAt: entity.createdAt.toISOString(),
 });
 
 @Injectable()
 export class PresetsService implements OnModuleInit {
+  private readonly logger = new Logger(PresetsService.name);
+
   constructor(
     @InjectRepository(StylePresetEntity)
     private readonly presets: Repository<StylePresetEntity>,
   ) {}
 
-  /** Seed one preset on a fresh database so the UI is never empty. */
   async onModuleInit(): Promise<void> {
+    await this.backfillMissingFields();
+    await this.seedDefault();
+  }
+
+  /**
+   * Fill in columns added after a preset was saved.
+   *
+   * Adding a column leaves existing rows null, and a null reaching the UI is
+   * indistinguishable from a missing style field — it breaks rendering. Repair
+   * on boot so an older database keeps working without being deleted.
+   */
+  private async backfillMissingFields(): Promise<void> {
+    const all = await this.presets.find();
+    const repaired = all.filter((preset) => {
+      let changed = false;
+      const fill = <K extends keyof StylePresetEntity>(
+        key: K,
+        fallback: StylePresetEntity[K],
+      ): void => {
+        if (preset[key] === null || preset[key] === undefined) {
+          preset[key] = fallback;
+          changed = true;
+        }
+      };
+
+      fill('layout', DEFAULT_STYLE.layout);
+      fill('fontFamily', DEFAULT_STYLE.fontFamily);
+      fill('fontWeight', DEFAULT_STYLE.fontWeight);
+      fill('fontSize', DEFAULT_STYLE.fontSize);
+      fill('subtitleFontSize', DEFAULT_STYLE.subtitleFontSize);
+      fill('foregroundHex', DEFAULT_STYLE.foregroundHex);
+      fill('backgroundHex', DEFAULT_STYLE.backgroundHex);
+      fill('accentHex', DEFAULT_STYLE.accentHex);
+      fill('cornerRadius', DEFAULT_STYLE.cornerRadius);
+      fill('anchor', DEFAULT_STYLE.anchor);
+      fill('offsetX', DEFAULT_STYLE.offsetX);
+      fill('offsetY', DEFAULT_STYLE.offsetY);
+      fill('padding', { ...DEFAULT_STYLE.padding });
+      return changed;
+    });
+
+    if (repaired.length > 0) {
+      await this.presets.save(repaired);
+      this.logger.log(`Backfilled ${String(repaired.length)} preset(s) with newer style fields`);
+    }
+  }
+
+  /** Seed one preset on a fresh database so the UI is never empty. */
+  private async seedDefault(): Promise<void> {
     if ((await this.presets.count()) > 0) return;
     await this.presets.save(
       this.presets.create({
         name: 'Default',
         fontFamily: DEFAULT_STYLE.fontFamily,
+        fontWeight: DEFAULT_STYLE.fontWeight,
         fontSize: DEFAULT_STYLE.fontSize,
         subtitleFontSize: DEFAULT_STYLE.subtitleFontSize,
         foregroundHex: DEFAULT_STYLE.foregroundHex,
         backgroundHex: DEFAULT_STYLE.backgroundHex,
+        accentHex: DEFAULT_STYLE.accentHex,
+        cornerRadius: DEFAULT_STYLE.cornerRadius,
+        anchor: DEFAULT_STYLE.anchor,
+        offsetX: DEFAULT_STYLE.offsetX,
+        offsetY: DEFAULT_STYLE.offsetY,
+        layout: DEFAULT_STYLE.layout,
         padding: DEFAULT_STYLE.padding,
       }),
     );

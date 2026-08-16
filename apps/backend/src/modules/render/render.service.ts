@@ -100,15 +100,15 @@ export class RenderService {
         width: request.width,
         height: request.height,
       };
-      // Geometry is constant across the clip — measure once, not 78 times.
-      const layout = this.frames.layoutFor(spec);
+      // Geometry is constant across the clip — build the plan once, not per frame.
+      const plan = this.frames.planFor(spec);
 
       try {
         await this.encoder.encode({
           outputPath,
           timing: request.timing,
           totalFrames: perItemFrames,
-          frame: (frameIndex) => this.frames.renderFrame(spec, frameIndex, layout),
+          frame: (frameIndex) => this.frames.renderFrame(spec, frameIndex, plan),
           onFrame: (frameIndex) => {
             // Report every 5 frames — enough for a smooth bar, few enough to
             // avoid flooding the socket on a long batch.

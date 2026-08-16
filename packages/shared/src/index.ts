@@ -6,5 +6,6 @@ export * from './dto/queue-item.dto';
 export * from './dto/push-title.dto';
 export * from './constants/defaults';
 export * from './layout/auto-scale';
+export * from './layout/plan';
 export * from './layout/animation';
 export * from './dto/render.dto';

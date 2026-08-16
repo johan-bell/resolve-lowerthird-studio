@@ -2,13 +2,23 @@
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { totalFrames, totalSeconds } from '@lower-thirds/shared';
+import { DEFAULT_TIMING } from '@lower-thirds/shared';
 import { useRenderStore } from '@/stores/render.store';
+import SectionHeader from './SectionHeader.vue';
 
 const render = useRenderStore();
 const { timing } = storeToRefs(render);
 
 const summary = computed(
   () => `${totalSeconds(timing.value).toFixed(1)}s · ${String(totalFrames(timing.value))} frames`,
+);
+
+const modified = computed(
+  () =>
+    timing.value.fps !== DEFAULT_TIMING.fps ||
+    timing.value.inSeconds !== DEFAULT_TIMING.inSeconds ||
+    timing.value.holdSeconds !== DEFAULT_TIMING.holdSeconds ||
+    timing.value.outSeconds !== DEFAULT_TIMING.outSeconds,
 );
 
 const fields = computed(() => [
@@ -20,10 +30,12 @@ const fields = computed(() => [
 
 <template>
   <div class="flex flex-col gap-2">
-    <span class="flex items-center justify-between text-[11px] tracking-wide text-zinc-500 uppercase">
-      Animation
-      <span class="font-mono text-[10px] normal-case tabular-nums">{{ summary }}</span>
-    </span>
+    <SectionHeader
+      title="Animation"
+      :hint="summary"
+      :modified="modified"
+      @reset="render.resetTiming()"
+    />
 
     <label v-for="field in fields" :key="field.key" class="flex flex-col gap-1">
       <span class="flex items-center justify-between text-[11px] text-zinc-400">

@@ -11,10 +11,6 @@ import LowerThirdMock from './LowerThirdMock.vue';
 /** The project raster the style's pixel values are expressed in. */
 const PROJECT_WIDTH = 1920;
 const PROJECT_HEIGHT = 1080;
-/** Must match SAFE_LEFT / BOTTOM_INSET in the backend frame renderer. */
-const SAFE_LEFT = 0.1;
-const BOTTOM_INSET = 0.18;
-
 const queue = useQueueStore();
 const styleStore = useStyleStore();
 const renderStore = useRenderStore();
@@ -26,6 +22,7 @@ const playback = useAnimationPlayback(timing);
 
 const stage = ref<HTMLElement | null>(null);
 const stageWidth = ref(0);
+const stageHeight = ref(0);
 const showSafeArea = ref(true);
 
 const scale = computed(() => (stageWidth.value > 0 ? stageWidth.value / PROJECT_WIDTH : 0));
@@ -39,10 +36,13 @@ onMounted(() => {
   if (!stage.value) return;
   observer = new ResizeObserver((entries) => {
     const entry = entries[0];
-    if (entry) stageWidth.value = entry.contentRect.width;
+    if (!entry) return;
+    stageWidth.value = entry.contentRect.width;
+    stageHeight.value = entry.contentRect.height;
   });
   observer.observe(stage.value);
   stageWidth.value = stage.value.clientWidth;
+  stageHeight.value = stage.value.clientHeight;
 });
 
 onBeforeUnmount(() => observer?.disconnect());
@@ -79,19 +79,19 @@ onBeforeUnmount(() => observer?.disconnect());
           class="pointer-events-none absolute inset-[10%] border border-dashed border-white/15"
         />
 
-        <div
-          class="absolute flex"
-          :style="{ left: `${String(SAFE_LEFT * 100)}%`, bottom: `${String(BOTTOM_INSET * 100)}%` }"
-        >
-          <LowerThirdMock
-            v-if="scale > 0"
-            :name="name"
-            :subtitle="subtitle"
-            :style="style"
-            :scale="scale"
-            :animation="playback.state.value"
-          />
-        </div>
+        <LowerThirdMock
+          v-if="scale > 0"
+          :name="name"
+          :subtitle="subtitle"
+          :style="style"
+          :stage-width="stageWidth"
+          :stage-height="stageHeight"
+          :scale="scale"
+          :animation="playback.state.value"
+          :project-width="PROJECT_WIDTH"
+          :project-height="PROJECT_HEIGHT"
+          @move="styleStore.patch($event)"
+        />
       </div>
     </div>
 

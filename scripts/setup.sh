@@ -149,7 +149,7 @@ shamefully-hoist=false
 strict-peer-dependencies=false
 EOF
 
-cat > package.json <<'EOF'
+write_if_absent package.json <<'EOF'
 {
   "name": "resolve-lowerthird-studio",
   "version": "0.1.0",
@@ -232,6 +232,7 @@ dist/
 .env
 apps/backend/data/
 renders/
+.pnpm-install.log
 python/.venv/
 __pycache__/
 .DS_Store
@@ -280,7 +281,7 @@ mkdir -p packages/shared/src/{dto,types,constants}
 
 # Emits CommonJS so the NestJS backend can require it natively; Vite pre-bundles
 # it for the browser via optimizeDeps.include (see apps/frontend/vite.config.ts).
-cat > packages/shared/package.json <<'EOF'
+write_if_absent packages/shared/package.json <<'EOF'
 {
   "name": "@lower-thirds/shared",
   "version": "0.1.0",
@@ -475,7 +476,7 @@ fi
 
 mkdir -p apps/frontend/src/assets/styles
 
-cat > apps/frontend/package.json <<'EOF'
+write_if_absent apps/frontend/package.json <<'EOF'
 {
   "name": "@lower-thirds/frontend",
   "version": "0.1.0",
@@ -690,7 +691,7 @@ EOF
 log "Writing @lower-thirds/backend"
 mkdir -p apps/backend/src apps/backend/data
 
-cat > apps/backend/package.json <<'EOF'
+write_if_absent apps/backend/package.json <<'EOF'
 {
   "name": "@lower-thirds/backend",
   "version": "0.1.0",
@@ -710,9 +711,11 @@ cat > apps/backend/package.json <<'EOF'
     "@nestjs/platform-socket.io": "^11.2.1",
     "@nestjs/typeorm": "^11.0.3",
     "@nestjs/websockets": "^11.2.1",
+    "@napi-rs/canvas": "^1.0.6",
     "better-sqlite3": "^12.11.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "ffmpeg-static": "^5.3.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
@@ -875,6 +878,11 @@ EOF
 
 [ -f python/resolve_bridge/__init__.py ] || : > python/resolve_bridge/__init__.py
 
+# The bridge checks that the scripting library exists before importing it. The
+# mock needs a stub at that path so it can stand in for a real Resolve install.
+mkdir -p python/tests/mock_resolve
+[ -f python/tests/mock_resolve/fusionscript.so ] || : > python/tests/mock_resolve/fusionscript.so
+
 if [ -d python/.venv ]; then
   log "Python venv already present — skipping"
 else
@@ -887,7 +895,52 @@ fi
 # 6. Install + first build
 # =============================================================================
 log "Installing workspace dependencies (this is the only network step)"
-pnpm install
+
+# pnpm >= 11 refuses lockfile entries published inside its minimumReleaseAge
+# window — a supply-chain guard against freshly-compromised releases. When a
+# dependency we already depend on trips it, record a targeted exception for
+# that exact version and retry, rather than weakening the policy globally.
+INSTALL_LOG="$ROOT_DIR/.pnpm-install.log"
+allow_recent_releases() {
+  node - "$INSTALL_LOG" <<'NODE'
+const fs = require('fs');
+const log = fs.readFileSync(process.argv[2], 'utf8');
+const FILE = 'pnpm-workspace.yaml';
+
+// Lines read: "  vue-tsc@3.3.10 was published at <date>, within the ... cutoff"
+const flagged = [...log.matchAll(/^\s*(\S+@[0-9][^\s]*)\s+was published at/gm)].map((m) => m[1]);
+if (flagged.length === 0) process.exit(1);
+
+const yaml = fs.readFileSync(FILE, 'utf8');
+const existing = new Set(
+  [...yaml.matchAll(/^\s+-\s+'?([^'\s]+)'?\s*$/gm)].map((m) => m[1]),
+);
+const fresh = flagged.filter((entry) => !existing.has(entry));
+if (fresh.length === 0) process.exit(1);
+
+const lines = fresh.map((entry) => `  - '${entry}'`).join('\n');
+const out = /^minimumReleaseAgeExclude:/m.test(yaml)
+  ? yaml.replace(/^minimumReleaseAgeExclude:$/m, `minimumReleaseAgeExclude:\n${lines}`)
+  : `${yaml.trimEnd()}\n\n# Versions we accept despite being newer than the release-age policy.\nminimumReleaseAgeExclude:\n${lines}\n`;
+fs.writeFileSync(FILE, out);
+console.log(fresh.join(' '));
+NODE
+}
+
+if ! pnpm install 2>&1 | tee "$INSTALL_LOG"; then
+  if grep -q "MINIMUM_RELEASE_AGE_VIOLATION" "$INSTALL_LOG"; then
+    ADDED="$(allow_recent_releases || true)"
+    if [ -n "$ADDED" ]; then
+      log "Allowing recently-published versions: $ADDED"
+      pnpm install 2>&1 | tee "$INSTALL_LOG"
+    else
+      fail "pnpm rejected the lockfile and no exception could be derived. See $INSTALL_LOG"
+    fi
+  else
+    fail "pnpm install failed. See $INSTALL_LOG"
+  fi
+fi
+rm -f "$INSTALL_LOG"
 
 log "Verifying the better-sqlite3 native binding"
 if ( cd apps/backend && node -e "require('better-sqlite3')" ) >/dev/null 2>&1; then
