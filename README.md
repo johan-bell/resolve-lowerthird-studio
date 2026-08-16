@@ -209,4 +209,5 @@ An earlier run didn't shut down. `pkill -f "vite|nest start"`, then start again.
 
 ## Licence
 
-Private project — all rights reserved.
+[MIT](LICENSE) — free to use, modify and distribute, provided the copyright
+notice is kept.
